@@ -1,14 +1,14 @@
 // mods/daily-30/archive.cjs
-// The archive the mod keeps on disk: one JSON file per platform and day, plus an index with the date,
-// song count and capture time so the home tab can list days without opening every file. The main entry
-// owns this; the client reads and writes through rpc, because the client has no file system.
+// The archive the mod keeps on disk: one JSON file per day, plus an index with the date, song count and
+// capture time so the home tab can list days without opening every file. The main entry owns this; the
+// client reads and writes through rpc, because the client has no file system.
 
 'use strict';
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const PLATFORMS = new Set(['qq', 'netease']);
+const PLATFORMS = new Set(['netease']);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const INDEX = 'index.json';
 
@@ -21,11 +21,9 @@ const cleanSong = (raw) => {
     const duration = Number(raw?.duration);
     return {
         id,
-        ...(text(raw?.mid, 80) ? { mid: text(raw?.mid, 80) } : {}),
         name: text(raw?.name, 300) || 'Unknown',
         artist: text(raw?.artist, 500),
         album: text(raw?.album, 300),
-        ...(text(raw?.albumMid, 80) ? { albumMid: text(raw?.albumMid, 80) } : {}),
         duration: Number.isFinite(duration) ? Math.max(0, Math.min(100_000, Math.round(duration))) : 0,
         cover: /^https?:\/\//i.test(cover) ? cover : '',
     };

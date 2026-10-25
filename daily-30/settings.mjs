@@ -5,10 +5,10 @@ import { label } from './labels.mjs';
 
 export const SETTINGS_SECTION = {
     id: 'capture',
-    label: label('每日30首', 'Daily 30'),
+    label: label('每日推荐', 'Daily Recommendation'),
     description: label(
-        '自动记录每天的两个推荐歌单。登录状态来自 Folia 自己的账号，不需要在这里再填一次。',
-        'Records both daily lists. Sign-in comes from your Folia accounts; nothing has to be entered here.',
+        '自动记录每天的网易云音乐「每日推荐」。登录状态来自 Folia 自己的账号，不需要在这里再填一次。',
+        'Records the NetEase Daily Recommendation. Sign-in comes from your Folia account; nothing has to be entered here.',
     ),
     settings: [
         {
@@ -35,13 +35,6 @@ export const SETTINGS_SECTION = {
                 { value: '120', label: label('2 小时', '2 hours') },
             ],
             group: label('记录', 'Recording'),
-        },
-        {
-            key: 'captureQq',
-            type: 'boolean',
-            label: label('记录 QQ 音乐', 'Record QQ Music'),
-            defaultValue: true,
-            group: label('平台', 'Platforms'),
         },
         {
             key: 'captureNetease',

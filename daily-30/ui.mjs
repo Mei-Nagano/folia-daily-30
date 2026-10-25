@@ -14,7 +14,7 @@ const messageOf = (error) => (error instanceof Error ? error.message : String(er
 const mountPage = (folium, capture, settings, container, ctx) => {
     const locale = ctx.locale || 'zh-CN';
     const t = labels(locale);
-    const state = { platform: 'qq', date: '', days: [], day: null, query: '', results: [], busy: '', error: '' };
+    const state = { date: '', days: [], day: null, query: '', results: [], busy: '', error: '' };
     let timer = 0;
     let searchSeq = 0;
     let refreshing = false;
@@ -34,16 +34,13 @@ const mountPage = (folium, capture, settings, container, ctx) => {
     const status = el('div', 'd30-status');
     const grid = el('div', 'd30-grid');
     const side = el('aside', 'd30-side');
-    const seg = el('div', 'd30-seg');
-    const qqButton = button('', t.qq, () => void selectPlatform('qq'));
-    const neteaseButton = button('', t.netease, () => void selectPlatform('netease'));
-    seg.append(qqButton, neteaseButton);
     const search = document.createElement('input');
     search.className = 'd30-search';
     search.placeholder = t.searchPlaceholder;
     search.type = 'search';
+    search.spellcheck = false;
     const dates = el('div', 'd30-dates');
-    side.append(seg, search, dates);
+    side.append(el('h2', 'd30-sidetitle', t.dateList), search, dates);
     const main = el('main', 'd30-main');
     const dayHead = el('div', 'd30-dayhead');
     const dayTitle = el('h2');
@@ -60,7 +57,7 @@ const mountPage = (folium, capture, settings, container, ctx) => {
     root.append(head, status, grid, foot);
     container.append(style, root);
 
-    const nodes = { record, refresh, exportButton, qqButton, neteaseButton, playAll, status, dates, dayTitle, dayMeta, songs, footStatus, footAuto };
+    const nodes = { record, refresh, exportButton, playAll, status, dates, dayTitle, dayMeta, songs, footStatus, footAuto };
     const render = () => renderPage({
         state,
         t,
@@ -77,7 +74,7 @@ const mountPage = (folium, capture, settings, container, ctx) => {
             return;
         }
         try {
-            state.day = await folium.rpc.call('archive.get', state.platform, state.date);
+            state.day = await folium.rpc.call('archive.get', 'netease', state.date);
         } catch (error) {
             state.day = null;
             folium.log.warn('[daily-30] could not read a day', error);
@@ -94,10 +91,9 @@ const mountPage = (folium, capture, settings, container, ctx) => {
         state.error = '';
         try {
             const days = await folium.rpc.call('archive.list');
-            state.days = Array.isArray(days) ? days : [];
-            const forPlatform = state.days.filter((day) => day.platform === state.platform);
-            if (!state.date || !forPlatform.some((day) => day.date === state.date)) {
-                state.date = forPlatform[0]?.date || '';
+            state.days = (Array.isArray(days) ? days : []).filter((day) => day?.platform === 'netease');
+            if (!state.date || !state.days.some((day) => day.date === state.date)) {
+                state.date = state.days[0]?.date || '';
             }
             await loadDay();
         } catch (error) {
@@ -110,20 +106,7 @@ const mountPage = (folium, capture, settings, container, ctx) => {
         }
     };
 
-    const selectPlatform = async (platform) => {
-        if (state.platform === platform) return;
-        state.platform = platform;
-        state.query = '';
-        state.results = [];
-        search.value = '';
-        const forPlatform = state.days.filter((day) => day.platform === platform);
-        state.date = forPlatform[0]?.date || '';
-        await loadDay();
-        render();
-    };
-
-    const selectDate = async (platform, date) => {
-        state.platform = platform;
+    const selectDate = async (date) => {
         state.date = date;
         state.query = '';
         state.results = [];
@@ -178,12 +161,12 @@ const mountPage = (folium, capture, settings, container, ctx) => {
         }
     };
 
-    const playOne = async (platform, song) => {
+    const playOne = async (song) => {
         if (state.busy) return;
         state.busy = 'play';
         render();
         try {
-            await playSong(folium, t, platform, song);
+            await playSong(folium, t, song);
         } catch (error) {
             folium.ui.toast(messageOf(error), { type: 'error' });
             folium.log.warn('[daily-30] play song failed', error);
@@ -244,7 +227,7 @@ const mountPage = (folium, capture, settings, container, ctx) => {
 
 export const registerHomeTab = (folium, capture, settings) => folium.registries.homeTabs.register({
     id: 'daily-30',
-    label: label('每日30首', 'Daily 30'),
+    label: label('每日推荐', 'Daily Recommendation'),
     order: 210,
     mount: (container, ctx) => mountPage(folium, capture, settings, container, ctx),
 });

@@ -3,7 +3,9 @@
 // and start at the first song. The home tab owns the busy state and the toasts; these functions only do
 // the queue work and throw a message the tab can show.
 
-const keysOf = (platform, songs) => songs.map((song) => ({ source: platform, id: String(song.id) }));
+const SOURCE = 'netease';
+
+const keysOf = (songs) => songs.map((song) => ({ source: SOURCE, id: String(song.id) }));
 
 const foundSongs = (resolved) => {
     const songs = [];
@@ -14,7 +16,7 @@ const foundSongs = (resolved) => {
 };
 
 export const playDay = async (folium, t, day) => {
-    const keys = keysOf(day.platform, day.songs);
+    const keys = keysOf(day.songs);
     if (!keys.length) throw new Error(t.noPlayable);
     const songs = foundSongs(await folium.omni.resolveSongs(keys));
     if (!songs.length) throw new Error(t.noPlayable);
@@ -32,8 +34,8 @@ export const playDay = async (folium, t, day) => {
     return { played: songs.length, missing: keys.length - songs.length };
 };
 
-export const playSong = async (folium, t, platform, song) => {
-    const [resolved] = await folium.omni.resolveSongs([{ source: platform, id: String(song.id) }]);
+export const playSong = async (folium, t, song) => {
+    const [resolved] = await folium.omni.resolveSongs([{ source: SOURCE, id: String(song.id) }]);
     if (resolved?.status !== 'found' || !resolved.song) throw new Error(t.noPlayable);
     const started = await folium.playback.playSong(resolved.song);
     if (!started) throw new Error(t.noPlayable);

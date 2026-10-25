@@ -5,19 +5,11 @@
 import { createCapture } from './capture.mjs';
 import { registerHomeTab } from './ui.mjs';
 import { SETTINGS_SECTION } from './settings.mjs';
-import { label } from './labels.mjs';
-
-const zhLocale = () => {
-    try {
-        return String(navigator.language || '').toLowerCase().startsWith('zh');
-    } catch {
-        return false;
-    }
-};
+import { fill, label, labels } from './labels.mjs';
 
 export default function activate(folium) {
     if (folium.host.folium.major !== 1 || folium.host.folium.minor < 7) {
-        throw new Error('每日30首需要 Folium 1.7（Folia 0.7.20 或更新版本）');
+        throw new Error('每日推荐需要 Folium 1.7（Folia 0.7.22 或更新版本）');
     }
     if (folium.env.context !== 'main') return undefined;
 
@@ -27,25 +19,24 @@ export default function activate(folium) {
 
     const open = folium.registries.commands.register({
         id: 'open',
-        label: label('打开每日30首', 'Open Daily 30'),
-        description: label('按日期回看两个平台的每日推荐。', 'Browse the daily recommendations from both platforms.'),
+        label: label('打开每日推荐', 'Open Daily Recommendation'),
+        description: label('按日期回看网易云的每日推荐。', 'Browse the NetEase daily recommendations by date.'),
         icon: 'calendar-days',
-        globalShortcut: true,
         run: () => folium.ui.openHomeTab('daily-30'),
     });
 
     const record = folium.registries.commands.register({
         id: 'record',
-        label: label('立即记录每日30首', 'Record Daily 30 now'),
-        description: label('现在检查两个平台，并把今天的歌单写进记录。', 'Check both platforms now and write the current lists to the archive.'),
+        label: label('立即记录每日推荐', 'Record the daily recommendation now'),
+        description: label('现在检查网易云音乐，并把今天的歌单写进记录。', 'Check NetEase now and write the current list to the archive.'),
         icon: 'refresh-cw',
         run: async () => {
             await capture.captureNow();
-            const results = Object.values(capture.getStatus().results);
-            const ok = results.filter((result) => result.ok).length;
-            const failed = results.length - ok;
-            if (zhLocale()) return failed ? `已检查，${failed} 个平台没有记录成功。` : '每日30首已检查。';
-            return failed ? `Checked; ${failed} platform(s) could not be recorded.` : 'Daily 30 is up to date.';
+            const t = labels(navigator.language || 'zh-CN');
+            const result = capture.getStatus().results.netease;
+            if (!result) return fill(t.recordFailed, { error: t.errorCodes.unknown });
+            const error = t.errorCodes[result.code] || t.errorCodes.unknown;
+            return result.ok ? fill(t.recorded, { n: result.count }) : fill(t.recordFailed, { error });
         },
     });
 

@@ -1,7 +1,7 @@
 // mods/daily-30/songs.mjs
-// One small, platform-neutral song record per entry: what the archive keeps and the list draws. The raw
-// answers differ (QQ uses singer/album/interval, NetEase uses ar/al/dt), so each platform gets its own
-// normalizer here and nothing downstream has to know which platform a record came from.
+// One small song record per entry: what the archive keeps and the list draws. The record is
+// platform-neutral, and the only normalizer left is NetEase's (raw uses ar/al, duration in ms), so
+// nothing downstream has to know which platform a record came from.
 
 const text = (value) => (value === undefined || value === null ? '' : String(value).trim());
 
@@ -21,27 +21,6 @@ const joinArtists = (list) => (
         ? list.map((artist) => text(artist?.name)).filter(Boolean).join(' / ')
         : ''
 );
-
-export const normalizeQqSong = (raw) => {
-    const mid = text(raw?.mid ?? raw?.songmid);
-    const id = positiveId(raw?.id ?? raw?.songid) || mid;
-    if (!id) return null;
-    const album = raw?.album ?? {};
-    const albumMid = text(album?.mid ?? raw?.albummid);
-    const duration = Math.max(0, Math.round(Number(raw?.interval ?? raw?.duration) || 0));
-    return {
-        id,
-        ...(mid ? { mid } : {}),
-        name: text(raw?.name ?? raw?.title ?? raw?.songname) || 'Unknown',
-        artist: joinArtists(raw?.singer ?? raw?.singers ?? raw?.artists),
-        album: text(album?.name),
-        ...(albumMid ? { albumMid } : {}),
-        duration,
-        cover: albumMid
-            ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${encodeURIComponent(albumMid)}.jpg`
-            : '',
-    };
-};
 
 export const normalizeNeteaseSong = (raw) => {
     const id = positiveId(raw?.id);
@@ -70,11 +49,6 @@ export const normalizeSongs = (rawSongs, normalize) => {
     return songs;
 };
 
-export const sameSongs = (left, right) => {
-    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
-    return left.every((song, index) => String(song?.id) === String(right[index]?.id));
-};
-
 export const platformTitle = (platform) => (
-    platform === 'netease' ? '网易云音乐每日推荐' : 'QQ 音乐每日30首'
+    platform === 'netease' ? '网易云音乐每日推荐' : platform
 );

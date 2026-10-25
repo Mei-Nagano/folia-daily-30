@@ -6,11 +6,9 @@ import { dayLabel, dateRow, el, emptyBlock, headRow, songRow } from './uiParts.m
 import { dayCount, errorLabel, songCount } from './labels.mjs';
 import { formatClock } from './dates.mjs';
 
-const platformName = (t, platform) => (platform === 'netease' ? t.netease : t.qq);
-
 export const renderPage = ({ state, t, locale, nodes, handlers, report, autoCapture }) => {
     const {
-        record, refresh, exportButton, qqButton, neteaseButton, playAll, status, dates,
+        record, refresh, exportButton, playAll, status, dates,
         dayTitle, dayMeta, songs, footStatus, footAuto,
     } = nodes;
 
@@ -19,20 +17,16 @@ export const renderPage = ({ state, t, locale, nodes, handlers, report, autoCapt
     refresh.disabled = state.busy === 'load';
     exportButton.disabled = state.busy === 'export';
     exportButton.textContent = state.busy === 'export' ? t.exporting : t.export;
-    qqButton.setAttribute('aria-pressed', String(state.platform === 'qq'));
-    neteaseButton.setAttribute('aria-pressed', String(state.platform === 'netease'));
     playAll.disabled = state.busy === 'play' || !state.day;
 
     status.replaceChildren();
-    for (const platform of ['qq', 'netease']) {
-        const result = report.results[platform];
-        if (!result) continue;
+    const result = report.results.netease;
+    if (result) {
         const item = el('span');
         item.append(el('span', 'd30-dot'));
-        if (result.skipped === 'rollover') item.append(`${platformName(t, platform)}: ${t.rollover}`);
-        else if (result.ok) item.append(`${platformName(t, platform)}: ${songCount(t, result.count)}`);
+        if (result.ok) item.append(`${t.netease}: ${songCount(t, result.count)}`);
         else {
-            item.append(`${platformName(t, platform)}: ${errorLabel(t, result.code)}`);
+            item.append(`${t.netease}: ${errorLabel(t, result.code)}`);
             item.classList.add('d30-error');
         }
         status.append(item);
@@ -45,11 +39,10 @@ export const renderPage = ({ state, t, locale, nodes, handlers, report, autoCapt
     footAuto.textContent = autoCapture === false ? t.autoOff : '';
 
     dates.replaceChildren();
-    const forPlatform = state.days.filter((day) => day.platform === state.platform);
-    if (!forPlatform.length) dates.append(el('p', 'd30-section-note', t.emptyPlatform));
-    for (const day of forPlatform) {
-        dates.append(dateRow(day, day.date === state.date, t, locale, (platform, date) => {
-            void handlers.selectDate(platform, date);
+    if (!state.days.length) dates.append(el('p', 'd30-section-note', t.emptyBody));
+    for (const day of state.days) {
+        dates.append(dateRow(day, day.date === state.date, t, locale, (date) => {
+            void handlers.selectDate(date);
         }));
     }
 
@@ -68,13 +61,12 @@ export const renderPage = ({ state, t, locale, nodes, handlers, report, autoCapt
             songs.append(el('p', 'd30-section-note', state.busy === 'search' ? t.resolving : t.noResults));
         } else {
             let last = '';
-            for (const result of state.results) {
-                const key = `${result.platform}:${result.date}`;
-                if (key !== last) {
-                    songs.append(el('div', 'd30-searchrow', `${platformName(t, result.platform)} · ${dayLabel(result.date, locale)}`));
-                    last = key;
+            for (const hit of state.results) {
+                if (hit.date !== last) {
+                    songs.append(el('div', 'd30-searchrow', dayLabel(hit.date, locale)));
+                    last = hit.date;
                 }
-                songs.append(songRow(result.song, result.position, t, () => void handlers.playOne(result.platform, result.song)));
+                songs.append(songRow(hit.song, hit.position, t, () => void handlers.playOne(hit.song)));
             }
         }
         return;
@@ -84,11 +76,11 @@ export const renderPage = ({ state, t, locale, nodes, handlers, report, autoCapt
         return;
     }
     if (!state.day) {
-        songs.append(emptyBlock(t.emptyTitle, state.date ? t.dayMissing : t.emptyPlatform));
+        songs.append(emptyBlock(t.emptyTitle, state.date ? t.dayMissing : t.emptyTitle));
         return;
     }
     songs.append(headRow(t));
     state.day.songs.forEach((song, position) => {
-        songs.append(songRow(song, position, t, () => void handlers.playOne(state.platform, song)));
+        songs.append(songRow(song, position, t, () => void handlers.playOne(song)));
     });
 };

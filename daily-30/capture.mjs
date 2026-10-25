@@ -1,15 +1,18 @@
 // mods/daily-30/capture.mjs
-// The recorder: fetches the enabled platforms' current lists, skips a QQ answer that is still yesterday's
-// just after midnight, writes each day through the main entry, and fills NetEase's server-side history
-// when the account is new to the archive. It also owns the timer and the "something changed" signal the
-// home tab listens to.
+// The recorder: fetches each enabled platform's current list through the host's platform.raw, writes it
+// through the main entry, and fills NetEase's server-side history when the account is new to the
+// archive. It also owns the timer and the "something changed" signal the home tab listens to.
 
-import { errorCode, fetchNeteaseDaily, fetchQqDaily, SourceError } from './sources.mjs';
-import { dateFor, isQqRolloverWindow, previousDate } from './dates.mjs';
-import { platformTitle, sameSongs } from './songs.mjs';
+import { errorCode, fetchNeteaseDaily, SourceError } from './sources.mjs';
+import { neteaseDate } from './dates.mjs';
+import { platformTitle } from './songs.mjs';
 import { createNeteaseBackfill } from './backfill.mjs';
 
-const sourceOf = (platform) => (platform === 'netease' ? fetchNeteaseDaily : fetchQqDaily);
+// Platforms this mod records. NetEase only: the QQ route needed the host's own sign-in session, which a
+// mod must not read (folium-compound review of issue #89).
+export const PLATFORMS = ['netease'];
+
+const sourceOf = () => fetchNeteaseDaily;
 
 const errorMessage = (error) => (
     error instanceof Error ? error.message : String(error)
@@ -49,39 +52,17 @@ export const createCapture = ({ folium, settings }) => {
             songs,
             ...extra,
         });
-        if (!answer?.ok) throw new SourceError('write', '无法写入每日30首记录');
+        if (!answer?.ok) throw new SourceError('write', '无法写入每日推荐记录');
         return answer;
     };
 
     const capturePlatform = async (platform) => {
-        const account = folium.account?.getState?.(platform);
-        if (platform === 'netease' && account?.status === 'signed-out') {
+        if (platform === 'netease' && folium.account?.getState?.(platform)?.status === 'signed-out') {
             throw new SourceError('not-signed-in', '网易云音乐未登录');
         }
-        const now = new Date();
-        const date = dateFor(platform, now);
+        const date = neteaseDate(new Date());
         const data = await sourceOf(platform)(folium);
         const songs = data.songs;
-
-        if (platform === 'qq' && isQqRolloverWindow(now)) {
-            const yesterday = previousDate(date);
-            try {
-                const previous = await folium.rpc.call('archive.get', 'qq', yesterday);
-                if (previous && sameSongs(previous.songs, songs)) {
-                    state.results.qq = {
-                        ok: true,
-                        skipped: 'rollover',
-                        date,
-                        count: songs.length,
-                        at: Date.now(),
-                    };
-                    return;
-                }
-            } catch {
-                // A missing archive must not stop today's capture.
-            }
-        }
-
         const saved = await save(platform, date, songs);
         state.results[platform] = {
             ok: true,
@@ -103,10 +84,8 @@ export const createCapture = ({ folium, settings }) => {
             notify();
             try {
                 const values = settings.get();
-                const platforms = [];
-                if (values.captureQq !== false) platforms.push('qq');
-                if (values.captureNetease !== false) platforms.push('netease');
-                for (const platform of platforms) {
+                for (const platform of PLATFORMS) {
+                    if (platform === 'netease' && values.captureNetease === false) continue;
                     try {
                         await capturePlatform(platform);
                     } catch (error) {
@@ -149,9 +128,10 @@ export const createCapture = ({ folium, settings }) => {
         retryTimer = null;
     };
 
+    // A network or rate-limit failure is worth one more try; anything else waits for the next interval.
     const scheduleRetry = () => {
         const retryable = Object.values(state.results).some((result) => (
-            result && result.ok === false && (result.code === 'backend-unavailable' || result.code === 'network')
+            result && result.ok === false && (result.code === 'network' || result.code === 'rate-limited')
         ));
         if (!retryable) {
             retries = 0;
@@ -190,7 +170,7 @@ export const createCapture = ({ folium, settings }) => {
         schedule();
         const offSettings = settings.onChange?.(() => schedule());
         const offAccount = folium.events.on('account.changed', (account) => {
-            if (account?.status === 'signed-in') kick();
+            if (account?.providerId === 'netease' && account?.status === 'signed-in') kick();
         });
         return () => {
             clearTimers();
@@ -199,10 +179,7 @@ export const createCapture = ({ folium, settings }) => {
         };
     };
 
-    const subscribe = (listener) => {
-        listeners.add(listener);
-        return () => listeners.delete(listener);
-    };
+    const captureNow = () => captureAll('manual');
 
     const getStatus = () => ({
         running: state.running,
@@ -211,11 +188,10 @@ export const createCapture = ({ folium, settings }) => {
         results: { ...state.results },
     });
 
-    return {
-        start,
-        stop: clearTimers,
-        captureNow: () => captureAll('manual'),
-        getStatus,
-        subscribe,
+    const subscribe = (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
     };
+
+    return { start, getStatus, captureNow, subscribe };
 };
